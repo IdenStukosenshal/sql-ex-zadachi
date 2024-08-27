@@ -1,0 +1,384 @@
+https://sql-ex.ru/dmlexercises.php
+
+
+№-1
+Из каждой группы ПК с одинаковым номером модели в таблице PC удалить все строки кроме строки
+ с наибольшим для этой группы кодом (столбец code)
+
+DELETE FROM pc
+ WHERE code NOT IN (
+		SELECT MAX(code) 
+		  FROM pc
+		 GROUP BY model
+ 	);
+
+
+
+№1
+Добавить в таблицу PC следующую модель:
+code: 20
+model: 2111
+speed: 950
+ram: 512
+hd: 60
+cd: 52x
+price: 1100
+
+INSERT INTO pc(code, model, speed, ram, hd, cd, price)
+VALUES(20, 2111, 950, 512, 60, '52x', 1100);
+
+
+
+№2
+Добавить в таблицу Product следующие продукты производителя Z:
+принтер модели 4003, ПК модели 4001 и блокнот модели 4002
+
+INSERT INTO product(maker, model, type)
+VALUES  ('Z', 4003, 'Printer'),
+		('Z', 4001, 'PC'),
+		('Z', 4002, 'Laptop');
+
+
+
+№3
+Добавить в таблицу PC модель 4444 с кодом 22, имеющую скорость процессора 1200 и цену 1350.
+Отсутствующие характеристики должны быть восполнены значениями по умолчанию, принятыми для соответствующих столбцов
+
+INSERT INTO pc(code, model, speed, price)
+VALUES (22, 4444, 1200, 1350);
+
+
+
+№4
+Для каждой группы блокнотов с одинаковым номером модели добавить запись в таблицу PC со следующими характеристиками:
+код: минимальный код блокнота в группе +20;
+модель: номер модели блокнота +1000;
+скорость: максимальная скорость блокнота в группе;
+ram: максимальный объем ram блокнота в группе *2;
+hd: максимальный объем hd блокнота в группе *2;
+cd: значение по умолчанию;
+цена: максимальная цена блокнота в группе, уменьшенная в 1,5 раза.
+Замечание. Считать номер модели числом.
+
+/*Использование INSERT с подзапросом*/
+INSERT INTO pc(code, model, speed, ram, hd, price)
+SELECT MIN(code)+20, model+1000, MAX(speed), MAX(ram)*2, MAX(hd)*2, MAX(price)/1.5
+  FROM laptop
+ GROUP BY model
+
+
+
+№5
+Удалить из таблицы PC компьютеры, имеющие минимальный объем диска или памяти.
+
+DELETE FROM pc 
+ WHERE ram = (SELECT MIN(ram) FROM pc) OR hd = (SELECT MIN(hd) FROM pc);
+
+
+
+№6
+Удалить все блокноты, выпускаемые производителями, которые не выпускают принтеры.
+
+DELETE FROM laptop WHERE model IN 
+(
+SELECT DISTINCT model FROM product WHERE maker NOT IN
+(SELECT DISTINCT maker
+   FROM product
+  WHERE type = 'Printer'
+)
+)
+
+
+
+№7
+Производство принтеров производитель A передал производителю Z. Выполнить соответствующее изменение.
+
+UPDATE product
+SET maker = 'Z'
+WHERE maker = 'A' AND type = 'Printer'
+
+№8
+Удалите из таблицы Ships все корабли, потопленные в сражениях.
+
+DELETE FROM ships
+WHERE name IN
+(
+SELECT ship FROM outcomes
+ WHERE result = 'sunk'
+)
+
+
+
+№9
+Измените данные в таблице Classes так, чтобы калибры орудий измерялись в
+сантиметрах (1 дюйм=2,5см), а водоизмещение в метрических тоннах (1
+метрическая тонна = 1,1 тонны). Водоизмещение вычислить с точностью до
+целых.
+
+UPDATE classes
+SET bore = bore*2.5, displacement = ROUND(displacement/1.1, 0)
+
+ROUND:
+* Второй аргумент этой функции указывает число десятичных знаков результата
+* Третий необязательный аргумент, который говорит о том, округлять ли результат
+(значение 0 - принимается по умолчанию) или отбрасывать цифры сверх удерживаемых (ненулевое значение).
+В MySQL нет третьего аргумента
+
+
+
+
+№10
+Добавить в таблицу PC те модели ПК из Product, которые отсутствуют в таблице PC.
+
+При этом модели должны иметь следующие характеристики:
+1. Код равен номеру модели плюс максимальный код, который был до вставки.
+2. Скорость, объем памяти и диска, а также скорость CD должны иметь максимальные характеристики
+ среди всех имеющихся в таблице PC.
+3. Цена должна быть средней среди всех ПК, имевшихся в таблице PC до вставки.
+
+
+
+/*Промежуточное решение*/
+WITH strks AS
+(
+SELECT (SELECT MAX(code) FROM pc)+model AS code,
+	   model,
+	   (SELECT MAX(speed) FROM pc) AS speed,
+	   (SELECT MAX(ram) FROM pc) AS ram,
+	   (SELECT MAX(hd) FROM pc) AS hd,
+	   (SELECT MAX(CAST(SUBSTRING(cd, 1, POSITION('x' IN cd)-1) AS INT)) FROM pc) AS cd,  /*затем CONCAT для MySQL*/
+	   (SELECT AVG(price) FROM pc) AS price 
+  FROM product
+ WHERE model NOT IN (SELECT model FROM pc) AND type = 'PC'
+)
+INSERT INTO pc(code, model, speed, ram, hd, cd, price)
+SELECT * FROM strks
+
+
+Проблема в определении cd, оно хранится в виде 12x, 40x и т.д.,
+ нужно узнать максимум, а затем вернуть к тому же виду.
+
+Узнать позицию 'x' : CHARINDEX('x', cd) для SQL Server, POSITION('x' IN cd) для MySQL
+Взять число из строки: CAST(SUBSTRING(cd, 1, POSITION('x' IN cd)-1) AS INT)
+Соединить обратно: CONCAT(..., 'x') для MySQL, ... + 'x' для Sql Server
+
+
+Итоговое выражение:
+
+WITH strks AS
+(
+SELECT (SELECT MAX(code) FROM pc)+model AS code,
+	   model,
+	   (SELECT MAX(speed) FROM pc) AS speed,
+	   (SELECT MAX(ram) FROM pc) AS ram,
+	   (SELECT MAX(hd) FROM pc) AS hd,
+	   CAST((SELECT MAX(CAST(SUBSTRING(cd, 1, (CHARINDEX('x', cd))-1) AS INT)) FROM pc) AS VARCHAR(10))+'x' AS cd,  /*CONCAT для MySQL*/
+	   (SELECT AVG(price) FROM pc) AS price 
+  FROM product
+ WHERE model NOT IN (SELECT model FROM pc) AND type = 'PC'
+)
+INSERT INTO pc(code, model, speed, ram, hd, cd, price)
+SELECT * FROM strks
+
+
+
+CAST((SELECT MAX(CAST(SUBSTRING(cd, 1, (CHARINDEX('x', cd))-1) AS INT)) FROM pc) AS VARCHAR(10))+'x' AS cd
+
+CONCAT(CAST((SELECT MAX(CAST(SUBSTRING(cd, 1, (POSITION('x' IN cd)-1) AS INT)) FROM pc) AS VARCHAR(10)), 'x') AS cd
+
+
+
+№11
+Для каждой группы блокнотов с одинаковым номером модели добавить запись в таблицу PC со следующими характеристиками:
+код: минимальный код блокнота в группе +20;
+модель: номер модели блокнота +1000;
+скорость: максимальная скорость блокнота в группе;
+ram: максимальный объем ram блокнота в группе *2;
+hd: максимальный объем hd блокнота в группе *2;
+cd: cd c максимальной скоростью среди всех ПК;
+цена: максимальная цена блокнота в группе, уменьшенная в 1,5 раза
+
+
+WITH laptop_set AS
+(
+SELECT
+	   MIN(code)+20 AS code,
+	   model+1000 AS model,
+	   MAX(speed) AS speed,
+	   MAX(ram)*2 AS ram,
+	   MAX(hd)*2 AS hd,
+	   CAST((SELECT MAX(CAST(SUBSTRING(cd, 1, (CHARINDEX('x', cd))-1) AS INT)) FROM pc) AS VARCHAR(10))+'x' AS cd,
+	   MAX(price)/1.5 AS price
+  FROM laptop
+ GROUP BY model
+)
+INSERT INTO pc(code, model, speed, ram, hd, cd, price)
+SELECT * FROM laptop_set;
+
+
+
+№12
+Добавьте один дюйм к размеру экрана каждого блокнота,
+выпущенного производителями E и B, и уменьшите его цену на $100.
+
+
+UPDATE laptop
+   SET screen = screen+1, price = price-100
+ WHERE model IN (SELECT l.model
+ 				   FROM product pr
+ 				   		INNER JOIN laptop l ON pr.model = l.model
+ 				  WHERE maker IN ('E', 'B')
+ 				);
+
+
+UPDATE laptop
+   SET screen = screen+1, price = price-100
+ WHERE model IN
+(
+SELECT l.model
+  FROM product pr
+ INNER JOIN laptop l ON pr.model = l.model
+ WHERE maker IN ('E', 'B')
+);
+
+
+
+№13
+Ввести в базу данных информацию о том, что корабль Rodney был потоплен в битве, произошедшей 25/10/1944,
+а корабль Nelson поврежден - 28/01/1945.
+Замечание: считать, что дата битвы уникальна в таблице Battles.
+
+
+INSERT INTO outcomes(ship, battle, result)
+VALUES('Rodney', (SELECT name FROM battles WHERE date = '1944-10-25'), 'sunk' ),
+	  ('Nelson', (SELECT name FROM battles WHERE date = '1945-01-28'), 'damaged');
+
+
+
+№14
+Удалите классы, имеющие в базе данных менее трех кораблей (учесть корабли из Outcomes).
+
+Класс без кораблей в базе данных также соответствует условиям задания, таким как 0 < 3.
+Проверьте случай, когда у класса есть 2 обычных корабля в таблице Ships и
+ головной корабль в таблице Outcomes, т.е. у этого класса 3 корабля в DB.
+
+
+WITH small_classes AS
+(
+SELECT class
+  FROM (SELECT c.class, s.name
+          FROM classes c
+               LEFT OUTER JOIN ships s ON c.class = s.class
+        UNION
+        SELECT c.class, o.ship
+          FROM outcomes o
+               INNER JOIN classes c ON c.class = o.ship
+      ) tbl
+ GROUP BY class
+HAVING COUNT(*) < 3
+)
+DELETE FROM classes
+ WHERE class IN (SELECT class FROM small_classes)  /*сомнительно???*/
+
+
+ 		ИЛИ
+
+
+WITH small_classes AS
+(
+SELECT c.class
+  FROM classes c 
+       LEFT OUTER JOIN (
+       			SELECT name, class FROM ships
+       			UNION
+       			SELECT ship, ship from outcomes
+       					) tbl ON c.class = tbl.class
+ GROUP BY c.class
+HAVING COUNT(*) < 3
+)
+DELETE FROM classes
+ WHERE class IN (SELECT class FROM small_classes)
+
+
+
+№15
+Для каждого пассажира удалить из таблицы pass_in_trip все записи о его полетах, кроме первого и последнего.
+
+Невероятно, но эти mom''s spaghetti прошли как правильный ответ
+Судя по всему можно сделать гораздо лучше
+
+WITH source_tbl AS
+(
+SELECT ID_psg,
+       CAST(CAST(CAST(date AS date) AS VARCHAR(10)) +' '+ CAST(CAST(time_out AS time) AS VARCHAR(10)) AS datetime) AS dtt,
+       t.trip_no AS trip_no     
+  FROM pass_in_trip pt
+       INNER JOIN trip t ON t.trip_no = pt.trip_no
+),
+
+result_trips AS
+(
+SELECT tbl.ID_psg, st.trip_no,  tbl.mx
+  FROM
+(
+SELECT ID_psg, dtt AS mx 
+  FROM source_tbl
+EXCEPT
+SELECT ID_psg, MIN(dtt) AS mx 
+  FROM source_tbl
+ GROUP BY ID_psg
+EXCEPT
+SELECT ID_psg, MAX(dtt) AS mx 
+  FROM source_tbl
+ GROUP BY ID_psg
+) tbl 
+	  INNER JOIN source_tbl st ON tbl.mx = st.dtt
+)
+
+
+DELETE FROM pass_in_trip
+ WHERE ID_psg IN (SELECT ID_psg
+ 	 			   FROM result_trips rt
+ 	 			  WHERE rt.trip_no = trip_no
+ 	 			    AND CAST(date AS date) = CAST(rt.mx AS date)
+ 	 			)
+ 	AND trip_no IN (SELECT trip_no
+ 					  FROM result_trips rt
+ 					 WHERE rt.ID_psg = ID_psg
+ 					   AND CAST(date AS date) = CAST(rt.mx AS date)
+ 				   )
+ 	AND CAST(date AS date) IN ( SELECT CAST(rt.mx AS date)
+ 								  FROM result_trips rt
+ 								 WHERE rt.ID_psg = ID_psg
+ 								   AND rt.trip_no = trip_no
+ 							  )
+   
+
+
+
+№16
+Удалить из таблицы Product те модели, которые отсутствуют в других таблицах.
+
+DELETE FROM product
+ WHERE model NOT IN(
+ 	   SELECT model
+ 	     FROM laptop
+ 	   UNION
+ 	   SELECT model
+ 	     FROM pc
+ 	   UNION
+ 	   SELECT model
+ 	     FROM printer        
+ 	)
+
+
+
+
+№17
+Удалить из таблицы PC компьютеры, у которых величина hd попадает в тройку наименьших значений.
+
+DELETE FROM pc ?????
+
+
+
+№18

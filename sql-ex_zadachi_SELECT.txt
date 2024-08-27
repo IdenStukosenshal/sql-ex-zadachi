@@ -1,0 +1,981 @@
+https://sql-ex.ru/learn_exercises.php
+
+№13
+Найдите среднюю скорость ПК, выпущенных производителем A.
+
+SELECT AVG(speed) Avg_speed
+  FROM pc
+       INNER JOIN product p ON p.model = pc.model
+ WHERE p.maker = 'A'
+
+№14
+Найдите класс, имя и страну для кораблей из таблицы Ships, имеющих не менее 10 орудий.
+
+SELECT c.class, s.name, c.country
+  FROM Classes c
+       INNER JOIN Ships s ON c.class = s.class
+ WHERE c.numGuns >= 10
+
+№15
+Найдите размеры жестких дисков, совпадающих у двух и более PC. Вывести: HD
+
+SELECT hd
+  FROM pc
+ GROUP BY hd
+HAVING count(*) >= 2
+
+
+№16
+	Найдите пары моделей PC, имеющих одинаковые скорость и RAM. В результате каждая пара указывается только один раз, т.е. (i,j), но не (j,i),
+Порядок вывода: модель с большим номером, модель с меньшим номером, скорость и RAM.
+
+SELECT DISTINCT p1.model, p2.model, p1.speed, p1.ram
+  FROM pc p1, pc p2
+ WHERE (p1.model > p2.model) AND (p1.speed = p2.speed) AND (p1.ram = p2.ram)
+
+
+№17
+Найдите модели ПК-блокнотов, скорость которых меньше скорости каждого из ПК.
+Вывести: type, model, speed
+
+SELECT DISTINCT p.type, l.model, l.speed
+  FROM laptop l
+       INNER JOIN product p ON l.model = p.model
+ WHERE l.speed < ALL (
+        SELECT speed FROM pc)
+
+№18
+Найдите производителей самых дешевых цветных принтеров. Вывести: maker, price
+
+SELECT DISTINCT pr.maker, p.price
+  FROM printer p
+       INNER JOIN product pr ON p.model = pr.model
+ WHERE p.color = 'y' AND p.price = (
+       SELECT MIN(price)
+         FROM printer
+        WHERE color = 'y')
+
+
+№19
+Для каждого производителя, имеющего модели в таблице Laptop, найдите средний размер экрана выпускаемых им 
+ПК-блокнотов.
+Вывести: maker, средний размер экрана 
+/*автор текста совсем дурак? Задача очень простая, но подача сбивает с толку*/
+
+SELECT p.maker, AVG(l.screen)
+  FROM laptop l
+       INNER JOIN product p ON p.model = l.model
+ GROUP BY p.maker
+
+ 
+№20
+Найдите производителей, выпускающих по меньшей мере три различных модели ПК. Вывести: Maker, число моделей ПК.
+
+SELECT maker, COUNT(model)
+  FROM product
+ WHERE type = 'PC'
+ GROUP BY maker
+HAVING COUNT(model) >= 3
+
+
+№21
+Найдите максимальную цену ПК, выпускаемых каждым производителем, у которого есть модели в таблице PC.
+Вывести: maker, максимальная цена.
+
+SELECT pr.maker, MAX(pc.price) 
+  FROM product pr
+       INNER JOIN pc ON pr.model = pc.model
+ GROUP BY pr.maker;
+
+
+№22
+Для каждого значения скорости ПК, превышающего 600 МГц, определите среднюю цену ПК с такой же скоростью.
+ Вывести: speed, средняя цена.
+
+SELECT speed, AVG(price)
+  FROM pc
+ GROUP BY speed
+HAVING speed > 600;
+
+
+№23
+Найдите производителей, которые производили бы как ПК со скоростью не менее 750 МГц,
+ так и ПК-блокноты со скоростью не менее 750 МГц.
+Вывести: Maker
+
+SELECT maker
+  FROM product pr
+       INNER JOIN pc ON pc.model = pr.model
+ WHERE speed >= 750
+INTERSECT
+SELECT maker
+  FROM product pr
+       INNER JOIN laptop l ON l.model = pr.model
+ WHERE speed >= 750;
+
+
+
+
+
+№24  ( использование CTE)
+Перечислите номера моделей любых типов, имеющих самую высокую цену по всей имеющейся в
+ базе данных продукции
+
+WITH tmp AS(
+SELECT model, price
+  FROM laptop
+ WHERE price = (SELECT MAX(price) FROM laptop)
+UNION
+SELECT model, price
+  FROM pc
+ WHERE price = (SELECT MAX(price) FROM pc)
+UNION
+SELECT model, price
+  FROM printer
+ WHERE price = (SELECT MAX(price) FROM printer))
+SELECT model
+  FROM tmp
+ WHERE price = (SELECT MAX(price) FROM tmp)
+
+
+№25
+Найдите производителей принтеров, которые производят ПК с наименьшим объемом RAM
+ и с самым быстрым процессором среди всех ПК, имеющих наименьший объем RAM. Вывести: Maker
+
+
+SELECT DISTINCT maker
+  FROM product
+ WHERE type = 'Printer' AND maker IN
+                 (
+SELECT pr.maker
+  FROM pc INNER JOIN product pr ON pr.model = pc.model
+ WHERE pc.ram = (SELECT MIN(ram) FROM pc)
+       AND
+    pc.speed = (SELECT MAX(speed) FROM pc WHERE ram = (SELECT MIN(ram) FROM pc))
+                  )
+
+
+
+
+    Ещё одно решение с CTE (выглядит ужасно, не знаю зачем я это придумал)
+WITH min_ram AS (SELECT MIN(ram) AS mr FROM pc),
+max_speed AS (SELECT MAX(speed) AS ms FROM pc WHERE ram = (SELECT mr FROM min_ram)),
+pc_makers AS (
+  SELECT pr.maker AS mkr
+  FROM pc
+  INNER JOIN product pr ON pr.model = pc.model
+  WHERE pc.ram = (SELECT mr FROM min_ram) AND pc.speed = (SELECT ms FROM max_speed)
+             )
+SELECT DISTINCT maker
+FROM product
+WHERE type = 'Printer' AND maker IN (SELECT mkr FROM pc_makers)
+
+
+№26
+Найдите среднюю цену ПК и ПК-блокнотов, выпущенных производителем A
+ (латинская буква). Вывести: одна общая средняя цена.
+
+SELECT AVG(price)
+  FROM (
+SELECT price
+  FROM laptop l INNER JOIN product pr ON pr.model = l.model
+ WHERE pr.maker = 'A'
+UNION ALL
+SELECT price
+  FROM pc INNER JOIN product pr ON pr.model = pc.model
+ WHERE pr.maker = 'A') AS prices /*использование псевдонима здесь обязательно*/
+
+
+№27
+Найдите средний размер диска ПК каждого из тех производителей, которые выпускают и принтеры.
+ Вывести: maker, средний размер HD
+
+//С этой задачей что-то не так, если доставать производителей присоединяя таблицу принтеров
+(на выходе literally тот же самый набор данных), это не подходит 😤
+
+SELECT pr.maker, AVG(pc.hd)
+  FROM pc
+       INNER JOIN product pr ON pr.model = pc.model
+ WHERE pr.maker IN 
+              (SELECT DISTINCT maker
+                FROM product WHERE type = 'printer'
+              )
+ GROUP BY pr.maker
+
+
+№28
+Используя таблицу Product, определить количество производителей, выпускающих по одной модели.
+
+SELECT COUNT(maker)
+  FROM (
+        SELECT maker
+          FROM product
+         GROUP BY maker
+        HAVING COUNT(model) = 1
+        ) result_set
+
+№29
+В предположении, что приход и расход денег на каждом пункте приема фиксируется не чаще одного раза в день
+[т.е. первичный ключ (пункт, дата)], написать запрос с выходными данными (пункт, дата, приход, расход).
+Использовать таблицы Income_o и Outcome_o.
+
+Задание писал какой-то кретин, абсолютно непонятно что нужно получить 😤
+
+SELECT i.point, i.date, i.inc, o.out
+  FROM Income_o i
+       LEFT OUTER JOIN Outcome_o o ON i.point = o.point AND i.date = o.date
+UNION
+SELECT o.point, o.date, i.inc, o.out
+  FROM Outcome_o o
+       LEFT OUTER JOIN Income_o i ON i.point = o.point AND i.date = o.date
+
+
+№30
+В предположении, что приход и расход денег на каждом пункте приема фиксируется произвольное число раз
+(первичным ключом в таблицах является столбец code),
+  требуется получить таблицу, в которой каждому пункту за каждую дату выполнения операций будет соответствовать одна строка.
+Вывод: point, date, суммарный расход пункта за день (out), суммарный приход пункта за день (inc).
+  Отсутствующие значения считать неопределенными (NULL).
+
+
+SELECT point, date, SUM(out), SUM(inc) FROM
+    (SELECT point, date, SUM(out) out, null inc
+      FROM Outcome
+     GROUP BY point, date
+    UNION
+    SELECT point, date, null out, SUM(inc) inc
+      FROM Income
+     GROUP BY point, date) tabl
+ GROUP BY point, date
+
+
+
+
+SELECT point, date, SUM(out), SUM(inc)
+  FROM (SELECT point, date, out, null inc FROM Outcome
+        UNION ALL
+        SELECT point, date, null out, inc FROM Income 
+       ) rs
+GROUP BY point, date
+
+
+№31
+Для классов кораблей, калибр орудий которых не менее 16 дюймов, укажите класс и страну.
+
+SELECT class, country
+  FROM classes
+ WHERE bore >=16
+
+
+
+№32
+Одной из характеристик корабля является половина куба калибра его главных орудий (mw).
+С точностью до 2 десятичных знаков определите среднее значение mw для кораблей каждой страны,
+у которой есть корабли в базе данных.
+
+
+SELECT country, CAST(AVG(POWER(bore, 3)/2) AS DECIMAL(6, 2))
+  FROM(
+      SELECT c.country, c.bore, s.name
+        FROM classes c INNER JOIN ships s ON c.class = s.class
+      UNION
+      SELECT c.country, c.bore, o.ship
+        FROM classes c INNER JOIN outcomes o ON o.ship = c.class
+       WHERE o.ship NOT IN (SELECT name FROM ships)   /*в outcomes есть корабли, отсутствующие в ships, нужно добавить их, избегая дублирования*/
+      ) rs
+ GROUP BY country
+
+
+№33
+Укажите корабли, потопленные в сражениях в Северной Атлантике (North Atlantic). Вывод: ship.
+
+SELECT ship
+  FROM outcomes o
+ WHERE battle = 'North Atlantic' AND result = 'sunk'
+
+
+№34
+По Вашингтонскому международному договору от начала 1922 г. запрещалось строить линейные корабли
+водоизмещением более 35 тыс.тонн. Укажите корабли, нарушившие этот договор
+ (учитывать только корабли c известным годом спуска на воду). Вывести названия кораблей.
+
+SELECT s.name
+  FROM classes c INNER JOIN ships s ON c.class = s.class
+ WHERE c.displacement > 35000 AND type = 'bb' AND launched >= 1922
+
+
+
+35
+В таблице Product найти модели, которые состоят только из цифр или только из латинских букв (A-Z, без учета регистра).
+Вывод: номер модели, тип модели.
+
+SELECT model, type
+  FROM product
+ WHERE  model ?? OR model ??
+
+В задаче присутствует ошибка в условии, фактическое решение противоречит ему + трудности с regex
+
+
+
+№36
+Перечислите названия головных кораблей, имеющихся в базе данных (учесть корабли в Outcomes).
+
+SELECT name FROM(
+
+SELECT s.name
+  FROM classes c
+       INNER JOIN ships s ON c.class = s.class
+UNION
+SELECT o.ship
+  FROM outcomes o
+       INNER JOIN classes c ON c.class = o.ship
+) t WHERE name IN (SELECT class FROM classes)
+
+
+
+№37
+Найдите классы, в которые входит только один корабль из базы данных (учесть также корабли в Outcomes).
+SELECT class
+  FROM (SELECT c.class, s.name
+          FROM classes c
+               INNER JOIN ships s ON c.class = s.class
+        UNION
+        SELECT c.class, o.ship
+          FROM outcomes o
+               INNER JOIN classes c ON c.class = o.ship
+      ) tbl
+ GROUP BY class
+HAVING COUNT(name) = 1
+
+
+
+№38
+Найдите страны, имевшие когда-либо классы обычных боевых кораблей
+ ('bb') и имевшие когда-либо классы крейсеров ('bc').
+
+
+SELECT country
+   FROM classes
+  WHERE type = 'bb'
+INTERSECT
+SELECT country
+   FROM classes
+  WHERE type = 'bc' /*возможно не будет работать с MySQL из-за INTERSECT*/
+
+
+
+SELECT country FROM
+(SELECT country
+   FROM classes
+  WHERE type = 'bb'
+UNION
+ SELECT country
+   FROM classes
+  WHERE type = 'bc'
+) tbl 
+ GROUP BY country
+HAVING COUNT(type) = 2
+
+/*Ещё 1 вариант решения*/
+SELECT t1.country
+  FROM (SELECT DISTINCT country
+         FROM classes
+        WHERE type = 'bb') t1
+  INNER JOIN (SELECT DISTINCT country
+                FROM classes
+               WHERE type = 'bc') t2
+  ON t1.country = t2.country
+
+
+
+№39
+Найдите корабли, `сохранившиеся для будущих сражений`;
+т.е. выведенные из строя в одной битве (damaged), они участвовали в другой, произошедшей позже.
+
+SELECT DISTINCT o.ship
+  FROM outcomes o INNER JOIN battles b ON o.battle = b.name
+ WHERE o.result = 'damaged'
+       AND EXISTS( SELECT ship
+                     FROM outcomes o2 INNER JOIN battles b2 ON o2.battle = b2.name
+                    WHERE o.ship = o2.ship AND b2.date > b.date
+                 )
+
+
+
+№40
+Найти производителей, которые выпускают более одной модели, при этом все выпускаемые
+производителем модели являются продуктами одного типа.
+Вывести: maker, type
+
+SELECT maker, type
+  FROM product
+ GROUP BY maker
+HAVING COUNT(DISTINCT model) > 1 AND COUNT(DISTINCT type) = 1
+
+
+
+№41
+  Для каждого производителя, у которого присутствуют модели хотя бы в одной из таблиц PC, Laptop или Printer,
+определить максимальную цену на его продукцию.
+  Вывод: имя производителя, если среди цен на продукцию данного производителя присутствует NULL,
+то выводить для этого производителя NULL, иначе максимальную цену.
+
+SELECT maker,
+       CASE 
+           WHEN SUM(CASE WHEN price IS NULL THEN 1 ELSE 0 END) > 0 THEN NULL
+           ELSE MAX(price)
+       END AS price
+  FROM
+(
+SELECT pr.maker, l.price AS price
+  FROM product pr INNER JOIN laptop l ON l.model = pr.model
+UNION
+SELECT pr.maker, pc.price AS price
+  FROM product pr INNER JOIN pc ON pc.model = pr.model
+UNION
+SELECT pr.maker, pt.price AS price
+  FROM product pr INNER JOIN printer pt ON pt.model = pr.model
+) tbl
+GROUP BY maker
+
+№42
+Найдите названия кораблей, потопленных в сражениях, и название сражения, в котором они были потоплены.
+
+SELECT DISTINCT ship, battle
+  FROM outcomes
+ WHERE result = 'sunk'
+
+
+
+№43
+Укажите сражения, которые произошли в годы,
+не совпадающие ни с одним из годов спуска кораблей на воду.
+
+SELECT name
+  FROM battles
+ WHERE EXTRACT(YEAR FROM date) NOT IN(
+       SELECT launched 
+         FROM ships
+        WHERE launched IS NOT NULL
+                                     )
+
+
+
+
+№44
+Найдите названия всех кораблей в базе данных, начинающихся с буквы R
+
+SELECT name
+  FROM
+(
+SELECT s.name
+  FROM ships s
+UNION
+SELECT o.ship
+  FROM outcomes o
+) tbl
+ WHERE name LIKE 'R%'
+
+  ИЛИ 
+
+SELECT s.name AS name
+  FROM ships s
+ WHERE s.name LIKE 'R%'
+UNION
+SELECT o.ship AS name
+  FROM outcomes o
+ WHERE o.ship LIKE 'R%'
+
+
+№45
+Найдите названия всех кораблей в базе данных, состоящие из трех и более слов (например, King George V).
+Считать, что слова в названиях разделяются единичными пробелами, и нет концевых пробелов.
+
+
+SELECT name
+  FROM ships
+ WHERE name LIKE '_% _% _%'
+UNION
+SELECT ship AS name
+  FROM outcomes
+ WHERE ship LIKE '_% _% _%'
+
+
+
+№46
+Для каждого корабля, участвовавшего в сражении при Гуадалканале (Guadalcanal),
+ вывести название, водоизмещение и число орудий.
+
+/*НЕПОНЯТНО*/
+
+SELECT o.ship, c.displacement, c.numGuns
+  FROM outcomes o 
+    LEFT OUTER JOIN ships s ON o.ship = s.name
+    LEFT JOIN classes c ON c.class = s.class OR c.class = o.ship
+ WHERE battle = 'Guadalcanal'
+
+
+
+№47
+Определить страны, которые потеряли в сражениях все свои корабли.
+
+/*Таблица стран и соответствующих кораблей*/
+SELECT c.country, s.name
+  FROM ships s INNER JOIN classes c ON s.class=c.class
+    UNION
+SELECT c.country, o.ship 
+  FROM outcomes o INNER JOIN classes c ON c.class=o.ship
+
+
+
+/*Работает, неизвестно почему*/
+WITH country_name_tbl AS
+(
+SELECT c.country, s.name
+  FROM ships s INNER JOIN classes c ON s.class=c.class
+    UNION
+SELECT c.country, o.ship 
+  FROM outcomes o INNER JOIN classes c ON c.class=o.ship
+)
+
+SELECT DISTINCT country
+  FROM country_name_tbl
+ WHERE country NOT IN ( /*эта хитрая логическая инструкция отсеивает все страны, у которых не все корабли потоплены*/
+         SELECT country FROM country_name_tbl
+         WHERE country_name_tbl.name NOT IN
+            (
+             SELECT ship FROM outcomes WHERE result = 'sunk'
+            )                          
+                      )
+
+
+
+/*не работает*/
+SELECT DISTINCT tbl.country, COUNT(tbl.name), SUM(CASE WHEN o.result = 'sunk' THEN 1 ELSE 0 END) 
+  FROM 
+(
+SELECT c.country, s.name AS name
+  FROM ships s INNER JOIN classes c ON s.class=c.class
+    UNION
+SELECT c.country, o.ship AS name
+  FROM outcomes o INNER JOIN classes c ON c.class=o.ship
+) tbl LEFT JOIN outcomes o ON tbl.name = o.ship
+
+GROUP BY tbl.country
+HAVING COUNT(tbl.name) = SUM(CASE WHEN o.result = 'sunk' THEN 1 ELSE 0 END) 
+
+
+
+№48
+Найдите классы кораблей, в которых хотя бы один корабль был потоплен в сражении.
+
+
+
+/*таблица всех классов и кораблей*/
+SELECT c.class, s.name
+  FROM classes c
+       INNER JOIN ships s ON c.class = s.class
+UNION
+SELECT c.class, o.ship
+  FROM outcomes o
+       INNER JOIN classes c ON c.class = o.ship
+
+
+
+
+SELECT DISTINCT tbl.class
+  FROM
+(
+SELECT c.class, s.name AS name
+  FROM classes c
+       INNER JOIN ships s ON c.class = s.class
+UNION
+SELECT c.class, o.ship AS name
+  FROM outcomes o
+       INNER JOIN classes c ON c.class = o.ship
+) tbl INNER JOIN outcomes o ON o.ship = tbl.name
+ WHERE o.result = 'sunk'
+
+
+№49
+Найдите названия кораблей с орудиями калибра 16 дюймов (учесть корабли из таблицы Outcomes).
+
+
+SELECT s.name
+  FROM classes c
+       INNER JOIN ships s ON c.class = s.class
+ WHERE c.bore = 16
+UNION
+SELECT o.ship
+  FROM outcomes o
+       INNER JOIN classes c ON c.class = o.ship
+ WHERE c.bore = 16
+
+
+
+№50
+Найдите сражения, в которых участвовали корабли класса Kongo из таблицы Ships.
+
+SELECT DISTINCT o.battle
+  FROM classes c
+       INNER JOIN ships s ON c.class = s.class
+       INNER JOIN outcomes o ON o.ship = s.name
+ WHERE c.class = 'Kongo'
+
+
+
+
+№51
+Найдите названия кораблей, имеющих наибольшее число орудий среди всех имеющихся кораблей
+ такого же водоизмещения (учесть корабли из таблицы Outcomes).
+
+INNER JOIN, OUTER JOIN, ALL/ANY
+
+WITH source_set AS
+(
+SELECT s.name AS name, c.numGuns, c.displacement
+  FROM classes c
+       INNER JOIN ships s ON c.class = s.class
+UNION
+SELECT o.ship AS name, c.numGuns, c.displacement
+  FROM outcomes o
+       INNER JOIN classes c ON c.class = o.ship
+),
+group_set AS
+(
+SELECT displacement, MAX(numGuns) AS mx_guns
+  FROM source_set
+GROUP BY displacement
+)
+
+SELECT name
+  FROM source_set s_s
+       INNER JOIN group_set g_s ON s_s.displacement = g_s.displacement
+ WHERE numGuns = mx_guns
+
+
+
+№52
+Определить названия всех кораблей из таблицы Ships, которые могут быть линейным японским кораблем,
+имеющим число главных орудий не менее девяти, калибр орудий менее 19 дюймов и водоизмещение не более 65 тыс.тонн
+
+ Явные операции соединения
+ Использование значения NULL в условиях поиска
+ Оператор CASE
+ Слова "могут быть" подразумевают, что некоторые характеристики корабля могут быть неизвестны (NULL)
+
+
+WITH ships_set AS
+(
+SELECT s.name, 
+       CASE
+         WHEN c.country IS NULL THEN 'Japan' ELSE c.country
+       END AS country,
+       CASE
+         WHEN c.type IS NULL THEN 'bb' ELSE c.type
+       END AS type,
+       CASE
+         WHEN c.numGuns IS NULL THEN 9 ELSE c.numGuns
+       END AS numGuns,
+       CASE
+         WHEN c.bore IS NULL THEN 18 ELSE c.bore
+       END AS bore,
+       CASE
+         WHEN c.displacement IS NULL THEN 65000 ELSE c.displacement
+       END AS displacement
+  FROM ships s INNER JOIN classes c ON s.class = c.class
+)
+SELECT name
+  FROM ships_set ss
+ WHERE country = 'Japan' AND type = 'bb' AND numGuns >= 9 AND bore < 19 AND displacement <= 65000;
+
+
+                  Для MySQL следующие задачи легче, так как не приходится преобразовывать типы данных
+  Для SQLServer пришлось бы сначала переводить в DECIMAL, считать среднее, потом округлять/преобразовывать ещё раз
+№53  
+Определите среднее число орудий для классов линейных кораблей.
+Получить результат с точностью до 2-х десятичных знаков.
+
+SELECT  ROUND(AVG(numGuns), 2)  AS avg_numguns
+  FROM classes
+ GROUP BY type
+HAVING type = 'bb';
+
+
+№54
+С точностью до 2-х десятичных знаков определите среднее число орудий
+всех линейных кораблей (учесть корабли из таблицы Outcomes).
+
+
+/*MySQL*/
+WITH nmg_all AS
+(
+SELECT c.class, s.name, c.numGuns
+  FROM classes c
+       INNER JOIN ships s ON c.class = s.class
+ WHERE c.type = 'bb'
+UNION
+SELECT c.class, o.ship, c.numGuns
+  FROM outcomes o
+       INNER JOIN classes c ON c.class = o.ship
+ WHERE c.type = 'bb'
+)
+SELECT ROUND(AVG(numGuns), 2)
+  FROM nmg_all
+
+
+
+/*SQLServer*/
+WITH nmg_all AS
+(
+SELECT c.class, s.name, c.numGuns
+  FROM classes c
+       INNER JOIN ships s ON c.class = s.class
+ WHERE c.type = 'bb'
+UNION
+SELECT c.class, o.ship, c.numGuns
+  FROM outcomes o
+       INNER JOIN classes c ON c.class = o.ship
+ WHERE c.type = 'bb'
+)
+SELECT CAST(AVG(CAST(numGuns AS DECIMAL(6, 2))) AS DECIMAL(6, 2))
+  FROM nmg_all
+
+
+
+№55
+Для каждого класса определите год, когда был спущен на воду первый корабль этого класса.
+Если год спуска на воду головного корабля неизвестен, определите минимальный год спуска на воду
+кораблей этого класса. Вывести: класс, год
+
+SELECT c.class, MIN(s.launched)
+  FROM classes c LEFT JOIN ships s ON c.class = s.class
+ GROUP BY c.class
+
+
+№56
+Для каждого класса определите число кораблей этого класса, потопленных в сражениях.
+Вывести: класс и число потопленных кораблей.
+
+
+WITH r_s AS
+(
+SELECT c.class, s.name, o.result
+  FROM classes c
+       INNER JOIN ships s ON c.class = s.class
+       LEFT JOIN outcomes o ON o.ship = s.name
+UNION
+SELECT c.class, o.ship AS name, o.result
+  FROM classes c
+       LEFT JOIN outcomes o ON c.class = o.ship
+)
+SELECT class, SUM(CASE WHEN result = 'sunk' THEN 1 ELSE 0 END)
+  FROM r_s
+ GROUP BY class
+
+
+!!! НЕ забывать, что можно применять DISTINCT подобным образом: count(distinct name)  !!!
+
+
+№57
+Для классов, имеющих потери в виде потопленных кораблей и не менее 3 кораблей в базе данных, вывести имя класса и число потопленных кораблей.
+ Явные операции соединения
+ Предложение GROUP BY
+ Предложение HAVING
+ Объединение
+ Предикат IN
+
+Максимально ленивое решение, Mom'`'s spagetti, может быть переделать потом?
+
+WITH all_ships AS
+(
+SELECT c.class, s.name
+  FROM classes c
+       INNER JOIN ships s ON c.class = s.class
+UNION
+SELECT c.class, o.ship AS name
+  FROM outcomes o
+       INNER JOIN classes c ON c.class = o.ship
+),
+ count_ships AS
+(
+SELECT class, COUNT(name) AS count_names
+  FROM all_ships
+ GROUP BY class
+),
+ r_s AS
+(
+SELECT c.class, s.name, o.result
+  FROM classes c
+       INNER JOIN ships s ON c.class = s.class
+       LEFT JOIN outcomes o ON o.ship = s.name
+UNION
+SELECT c.class, o.ship AS name, o.result
+  FROM classes c
+       LEFT JOIN outcomes o ON c.class = o.ship
+), 
+ sunk_ships AS
+(
+SELECT class, SUM(CASE WHEN result = 'sunk' THEN 1 ELSE 0 END) AS sunkd
+  FROM r_s
+ GROUP BY class
+)
+
+SELECT c_s.class, s_s.sunkd
+  FROM count_ships c_s
+       INNER JOIN sunk_ships s_s ON c_s.class = s_s.class
+ WHERE c_s.count_names >= 3 AND s_s.sunkd != 0
+
+
+№58
+Для каждого типа продукции и каждого производителя из таблицы Product c точностью до двух десятичных знаков найти процентное отношение
+ числа моделей данного типа данного производителя к общему числу моделей этого производителя.
+Вывод: maker, type, процентное отношение числа моделей данного типа к общему числу моделей производителя
+
+ Получение итоговых значений
+ Преобразoвание типов
+ Явные операции соединения
+ Декартово произведение
+ Коррелирующие подзапросы
+ Целочисленное деление
+
+
+
+/*CROSS JOIN*/
+SELECT pr1.maker, pr2.type
+  FROM product pr1, product pr2
+ GROUP BY pr1.maker, pr2.type
+
+/*CROSS JOIN*/
+SELECT pr1.maker, pr2.type
+  FROM product pr1 CROSS JOIN product pr2
+ GROUP BY pr1.maker, pr2.type
+
+/*Решение не моё*/
+
+SELECT
+       pr1.maker,
+       pr2.type,
+       ROUND(
+         (SELECT COUNT(pr.type)
+            FROM product pr
+           WHERE pr.maker = pr1.maker AND pr.type = pr2.type
+         )
+         /
+         (SELECT COUNT(pr.type)
+            FROM product pr
+           WHERE pr.maker = pr1.maker
+         )*100, 2) AS prc
+  FROM product pr1 CROSS JOIN product pr2
+ GROUP BY pr1.maker, pr2.type
+
+
+
+№59
+Посчитать остаток денежных средств на каждом пункте приема для базы данных с отчетностью
+ не чаще одного раза в день. Вывод: пункт, остаток.
+
+
+/*Проблема в том, что может быть в "in" таблице больше пунктов, чем в "out" таблице
+(не успели потратить деньги)*/
+
+WITH tbl1 AS
+(
+SELECT i.point, SUM(i.inc) d
+  FROM income_o i
+ GROUP BY i.point
+), tbl2 AS
+(
+SELECT o.point, SUM(o.out) d
+  FROM outcome_o o
+GROUP BY o.point
+)
+SELECT tbl1.point, tbl1.d - (CASE WHEN tbl2.d IS NULL THEN 0 ELSE tbl2.d END)
+  FROM tbl1 LEFT JOIN tbl2 ON tbl1.point = tbl2.point
+
+
+
+WITH tbl1 AS
+(
+SELECT i.point, SUM(i.inc) d
+  FROM income_o i
+ GROUP BY i.point
+UNION
+SELECT o.point, -SUM(o.out) d
+  FROM outcome_o o
+GROUP BY o.point
+)
+SELECT point, SUM(d) 
+  FROM tbl1
+GROUP BY  point
+
+
+
+
+№60
+Посчитать остаток денежных средств на начало дня 15/04/01 на каждом пункте приема для базы данных с отчетностью
+не чаще одного раза в день.
+ Вывод: пункт, остаток.
+Замечание. Не учитывать пункты, информации о которых нет до указанной даты.
+
+
+//Ненавижу автора этой задачи, потратил огромное количество времени на поиск ошибки, чтобы потом узнать, что
+нужно дату НЕ включительно 🤬
+
+WITH tbl1 AS
+(
+SELECT i.point, SUM(i.inc) d
+  FROM (SELECT * FROM income_o WHERE date < '2001-04-15') i
+ GROUP BY i.point
+), tbl2 AS
+(
+SELECT o.point, SUM(o.out) d
+  FROM (SELECT * FROM outcome_o WHERE date < '2001-04-15') o
+ GROUP BY o.point
+)
+SELECT tbl1.point, tbl1.d - (CASE WHEN tbl2.d IS NULL THEN 0 ELSE tbl2.d END)
+  FROM tbl1 LEFT JOIN tbl2 ON tbl1.point = tbl2.point
+
+
+
+№61
+Посчитать остаток денежных средств на всех пунктах приема для базы данных с отчетностью не чаще одного раза в день.
+
+
+//Правильно но похоже очень не эффективно
+WITH tbl1 AS
+(
+SELECT i.point, SUM(i.inc) d
+  FROM income_o i
+ GROUP BY i.point
+), tbl2 AS
+(
+SELECT o.point, SUM(o.out) d
+  FROM outcome_o o
+GROUP BY o.point
+)
+SELECT SUM(tbl1.d - (CASE WHEN tbl2.d IS NULL THEN 0 ELSE tbl2.d END))
+  FROM tbl1 LEFT JOIN tbl2 ON tbl1.point = tbl2.point
+
+
+
+
+Это неправильно, неизвестно почему
+SELECT
+  (SELECT SUM(CASE WHEN inc IS NULL THEN 0 ELSE inc END) r
+     FROM income_o)
+   -
+  (SELECT SUM(CASE WHEN out IS NULL THEN 0 ELSE out END) r
+     FROM outcome_o)
+  AS r
+
+При этом это решение правильно
+WITH tbl1 AS
+(
+SELECT SUM(inc) r FROM income_o 
+UNION
+SELECT -SUM(out) r FROM outcome_o
+)
+
+SELECT SUM(r)
+  FROM tbl1
