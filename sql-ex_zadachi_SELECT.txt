@@ -959,17 +959,8 @@ SELECT SUM(tbl1.d - (CASE WHEN tbl2.d IS NULL THEN 0 ELSE tbl2.d END))
 
 
 
+Другой вариант
 
-Это неправильно, неизвестно почему
-SELECT
-  (SELECT SUM(CASE WHEN inc IS NULL THEN 0 ELSE inc END) r
-     FROM income_o)
-   -
-  (SELECT SUM(CASE WHEN out IS NULL THEN 0 ELSE out END) r
-     FROM outcome_o)
-  AS r
-
-При этом это решение правильно
 WITH tbl1 AS
 (
 SELECT SUM(inc) r FROM income_o 
@@ -979,3 +970,25 @@ SELECT -SUM(out) r FROM outcome_o
 
 SELECT SUM(r)
   FROM tbl1
+
+
+№62
+Посчитать остаток денежных средств на всех пунктах приема на начало дня 15/04/01
+ для базы данных с отчетностью не чаще одного раза в день.
+
+WITH tbl AS
+(
+SELECT SUM(inc) s FROM income_o WHERE date < '2001-04-15'
+UNION 
+SELECT -1 * SUM(out) s FROM outcome_o WHERE date < '2001-04-15'
+)
+SELECT SUM(s)
+  FROM tbl
+
+Ещё вариант (лучше):  
+
+SELECT 
+       (SELECT SUM(inc) s FROM income_o WHERE date < '2001-04-15')
+        -
+       (SELECT SUM(out) s FROM outcome_o WHERE date < '2001-04-15')
+       AS result
