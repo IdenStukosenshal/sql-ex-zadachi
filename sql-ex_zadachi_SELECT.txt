@@ -972,6 +972,7 @@ SELECT SUM(r)
   FROM tbl1
 
 
+
 №62
 Посчитать остаток денежных средств на всех пунктах приема на начало дня 15/04/01
  для базы данных с отчетностью не чаще одного раза в день.
@@ -992,3 +993,14 @@ SELECT
         -
        (SELECT SUM(out) s FROM outcome_o WHERE date < '2001-04-15')
        AS result
+
+
+
+№63
+Определить имена разных пассажиров, когда-либо летевших на одном и том же месте более одного раза.
+
+
+SELECT p.name
+  FROM pass_in_trip pt INNER JOIN passenger p ON p.id_psg = pt.id_psg
+ GROUP BY pt.id_psg
+HAVING COUNT(pt.place) != COUNT(DISTINCT pt.place)
