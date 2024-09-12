@@ -1,5 +1,10 @@
 https://sql-ex.ru/learn_exercises.php
 
+
+В основном решения рассчитаны на MySQL, но в некоторых случаях (когда столбец называется 'out')
+возвращается ошибка, также в некоторых других случаях    используется MSSQL
+
+
 №13
 Найдите среднюю скорость ПК, выпущенных производителем A.
 
@@ -999,8 +1004,62 @@ SELECT
 №63
 Определить имена разных пассажиров, когда-либо летевших на одном и том же месте более одного раза.
 
+MySQL:
 
 SELECT p.name
   FROM pass_in_trip pt INNER JOIN passenger p ON p.id_psg = pt.id_psg
  GROUP BY pt.id_psg
 HAVING COUNT(pt.place) != COUNT(DISTINCT pt.place)
+
+MSSQL:
+
+WITH tbl AS
+(
+SELECT pt.id_psg 
+  FROM pass_in_trip pt 
+ GROUP BY pt.id_psg
+HAVING COUNT(pt.place) != COUNT(DISTINCT pt.place)
+)
+SELECT p.name
+  FROM tbl INNER JOIN passenger p ON p.id_psg = tbl.id_psg
+
+
+
+№64
+Используя таблицы Income и Outcome, для каждого пункта приема определить дни,
+ когда был приход, но не было расхода и наоборот.
+Вывод: пункт, дата, тип операции (inc/out), денежная сумма за день.
+
+MySQL:
+
+WITH rs AS
+(
+SELECT i.point, i.date, 'inc' AS operation_type, i.inc AS money
+  FROM income i LEFT JOIN outcome o ON i.date = o.date AND i.point = o.point
+ WHERE o.out IS NULL
+UNION ALL
+SELECT o.point, o.date, 'out' AS operation_type, o.out AS money
+  FROM income i RIGHT JOIN outcome o ON i.date = o.date AND i.point = o.point
+ WHERE i.inc IS NULL
+)
+
+SELECT point, date, operation_type, SUM(money)
+  FROM rs
+ GROUP BY point, date
+
+MSSQL:
+
+WITH rs AS
+(
+SELECT i.point, i.date, 'inc' AS operation_type, i.inc AS money
+  FROM income i LEFT JOIN outcome o ON i.date = o.date AND i.point = o.point
+ WHERE o.out IS NULL
+UNION ALL
+SELECT o.point, o.date, 'out' AS operation_type, o.out AS money
+  FROM income i RIGHT JOIN outcome o ON i.date = o.date AND i.point = o.point
+ WHERE i.inc IS NULL
+)
+
+SELECT point, date, operation_type, SUM(money)
+  FROM rs
+ GROUP BY point, date, operation_type
