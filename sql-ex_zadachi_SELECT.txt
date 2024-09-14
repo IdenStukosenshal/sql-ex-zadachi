@@ -1065,6 +1065,23 @@ SELECT point, date, operation_type, SUM(money)
  GROUP BY point, date, operation_type
 
 
+
+========================================================================================================
+Ещё один важный способ сортировки. Когда нужно отсортировать по определённому порядку значений в столбце.
+
+Отсортировать в порядке: PC, Laptop, Printer (столбец type)
+
+ MySQL: ORDER BY FIELD(type, 'PC', 'Laptop', 'Printer' )
+
+ MSSQL: ORDER BY CASE type
+                      WHEN 'PC' THEN 1
+                      WHEN 'Laptop' THEN 2
+                      WHEN 'Printer' THEN 3
+                      ELSE 4
+                 END
+========================================================================================================
+
+
 №65
 Пронумеровать уникальные пары {maker, type} из Product, упорядочив их следующим образом:
 - имя производителя (maker) по возрастанию;
@@ -1072,4 +1089,84 @@ SELECT point, date, operation_type, SUM(money)
 Если некий производитель выпускает несколько типов продукции, то выводить его имя только в первой строке;
 остальные строки для ЭТОГО производителя должны содержать пустую строку символов ('').
 
-НЕ РЕШЕНО
+
+
+Это верное решение, ORDER BY добавлен потому что порядок строк в CTE не гарантируется
+
+MySQL:
+WITH rs AS
+(
+SELECT DISTINCT maker, type
+  FROM product
+), rs_2 AS
+( 
+SELECT ROW_NUMBER() OVER(ORDER BY maker, FIELD(type, 'PC', 'Laptop', 'Printer' )) num, maker, type
+  FROM rs
+ ORDER BY maker, FIELD(type, 'PC', 'Laptop', 'Printer' )
+), rs_3 AS
+(
+SELECT num, maker, type, ROW_NUMBER() OVER(PARTITION BY maker ORDER BY num, maker) AS number_maker
+  FROM rs_2
+ ORDER BY num, maker, FIELD(type, 'PC', 'Laptop', 'Printer' )
+)
+SELECT num, (CASE WHEN number_maker = 1 THEN maker ELSE '' END) maker, type
+  FROM rs_3
+ ORDER BY num
+
+
+
+Ещё один вариант(лучше):
+
+WITH rs1 AS
+(
+SELECT
+       ROW_NUMBER() OVER(ORDER BY maker, FIELD(type, 'PC', 'Laptop', 'Printer' )) num,
+       maker,
+       type,
+       ROW_NUMBER() OVER(PARTITION BY maker ORDER BY maker, FIELD(type, 'PC', 'Laptop', 'Printer' )) AS n_maker_part
+  FROM ( SELECT DISTINCT maker, type FROM product) rs
+ ORDER BY maker, FIELD(type, 'PC', 'Laptop', 'Printer' )
+)
+SELECT num, (CASE WHEN n_maker_part = 1 THEN maker ELSE '' END) maker, type
+  FROM rs1
+
+
+
+ Адаптированное решение для MSSQL:
+
+WITH rs1 AS
+(
+SELECT
+       ROW_NUMBER() OVER(ORDER BY maker, (CASE type
+                                            WHEN 'PC' THEN 1
+                                            WHEN 'Laptop' THEN 2
+                                            WHEN 'Printer' THEN 3
+                                            ELSE 4
+                                       END)) num,
+       maker,
+       type,
+       ROW_NUMBER() OVER(PARTITION BY maker ORDER BY maker, (CASE type
+                                                              WHEN 'PC' THEN 1
+                                                              WHEN 'Laptop' THEN 2
+                                                              WHEN 'Printer' THEN 3                                                              
+                                                            END)) AS n_maker_part
+  FROM ( SELECT DISTINCT maker, type FROM product) rs
+ ORDER BY maker, (CASE type
+                      WHEN 'PC' THEN 1
+                      WHEN 'Laptop' THEN 2
+                      WHEN 'Printer' THEN 3                      
+                 END)
+
+)
+SELECT num, (CASE WHEN n_maker_part = 1 THEN maker ELSE '' END) maker, type
+  FROM rs1
+
+
+
+
+
+
+
+
+
+
