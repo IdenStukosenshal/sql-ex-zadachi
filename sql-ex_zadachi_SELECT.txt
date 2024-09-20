@@ -1163,10 +1163,29 @@ SELECT num, (CASE WHEN n_maker_part = 1 THEN maker ELSE '' END) maker, type
 
 
 
+№66
+Для всех дней в интервале с 01/04/2003 по 07/04/2003 определить число рейсов из Rostov с пассажирами на борту.
+Вывод: дата, количество рейсов.
 
-
-
-
-
-
-
+MySQL:
+WITH dt_tbl AS
+(
+SELECT DATE_ADD('2003-04-01 00:00:00', INTERVAL(tbl.num) DAY) dt
+FROM(
+  SELECT 0 num UNION
+  SELECT 1 num UNION
+  SELECT 2 num UNION
+  SELECT 3 num UNION
+  SELECT 4 num UNION
+  SELECT 5 num UNION
+  SELECT 6 num
+    ) tbl
+), rs AS
+(
+SELECT pt.date AS dt, COUNT(DISTINCT t.trip_no) AS count
+  FROM pass_in_trip pt INNER JOIN trip t ON pt.trip_no = t.trip_no
+ WHERE town_from = 'Rostov' AND date BETWEEN '2003-04-01' AND '2003-04-07'
+ GROUP BY pt.date
+)
+SELECT dt_tbl.dt, (CASE WHEN rs.count IS NULL THEN 0 ELSE rs.count END) AS count
+  FROM dt_tbl LEFT JOIN rs ON rs.dt = dt_tbl.dt
