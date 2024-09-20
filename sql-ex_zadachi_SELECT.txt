@@ -1091,7 +1091,7 @@ SELECT point, date, operation_type, SUM(money)
 
 
 
-Это верное решение, ORDER BY добавлен потому что порядок строк в CTE не гарантируется
+ ORDER BY добавлен потому что порядок строк не сохраняется
 
 MySQL:
 WITH rs AS
