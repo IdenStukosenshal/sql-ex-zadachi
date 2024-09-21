@@ -1189,3 +1189,35 @@ SELECT pt.date AS dt, COUNT(DISTINCT t.trip_no) AS count
 )
 SELECT dt_tbl.dt, (CASE WHEN rs.count IS NULL THEN 0 ELSE rs.count END) AS count
   FROM dt_tbl LEFT JOIN rs ON rs.dt = dt_tbl.dt
+
+
+
+№67
+Найти количество маршрутов, которые обслуживаются наибольшим числом рейсов.
+Замечания.
+1) A - B и B - A считать РАЗНЫМИ маршрутами.
+2) Использовать только таблицу Trip
+
+
+WITH t1 AS
+(
+SELECT town_from, town_to, COUNT(trip_no) AS count_trips
+  FROM trip
+ GROUP BY town_from, town_to
+)
+SELECT COUNT(t1.count_trips) AS count  
+  FROM t1
+ WHERE t1.count_trips >= ALL(SELECT count_trips FROM t1)
+
+
+Возможно это решение лучше
+
+WITH t1 AS
+(
+SELECT town_from, town_to, COUNT(trip_no) AS count_trips
+  FROM trip
+ GROUP BY town_from, town_to
+)
+SELECT COUNT(t1.count_trips) AS count  
+  FROM t1
+ WHERE t1.count_trips = (SELECT MAX(count_trips) FROM t1)
