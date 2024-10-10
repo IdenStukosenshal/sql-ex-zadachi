@@ -1221,3 +1221,61 @@ SELECT town_from, town_to, COUNT(trip_no) AS count_trips
 SELECT COUNT(t1.count_trips) AS count  
   FROM t1
  WHERE t1.count_trips = (SELECT MAX(count_trips) FROM t1)
+
+
+
+№68
+Найти количество маршрутов, которые обслуживаются наибольшим числом рейсов.
+Замечания.
+1) A - B и B - A считать ОДНИМ И ТЕМ ЖЕ маршрутом.
+2) Использовать только таблицу Trip
+
+
+
+НЕ РЕШЕНО
+
+(SELECT count_trips FROM t1 t2 WHERE t2.town_from = t1.town_to AND t2.town_to = t1.town_from) 
+
+WITH t1 AS
+(
+SELECT town_from, town_to, COUNT(trip_no) AS count_trips
+  FROM trip
+ GROUP BY town_from, town_to
+)
+SELECT ?????
+
+
+
+№69
+
+По таблицам Income и Outcome для каждого пункта приема найти остатки денежных средств на конец каждого дня,
+в который выполнялись операции по приходу и/или расходу на данном пункте.
+Учесть при этом, что деньги не изымаются, а остатки/задолженность переходят на следующий день.
+Вывод: пункт приема, день в формате "dd/mm/yyyy", остатки/задолженность на конец этого дня.
+
+
+MySQL:
+WITH tbl AS
+(
+SELECT i.point,
+       i.date,
+       SUM(i.inc)  sm
+  FROM income i
+ GROUP BY i.date, i.point
+UNION
+SELECT o.point,
+       o.date,
+       -1*SUM(o.out)  sm
+  FROM outcome o
+ GROUP BY o.date, o.point
+)
+SELECT DISTINCT point, DATE_FORMAT(date, '%d/%m/%Y') AS formatted_data,
+ (SELECT SUM(sm)
+          FROM tbl x
+         WHERE x.point = tbl.point AND x.date <= tbl.date
+        ) osttk
+  FROM tbl
+ORDER BY point, date
+
+
+DATE_FORMAT(date, '%d/%m/%Y') AS formatted_data
